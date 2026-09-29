@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALDAP - Koleksi Buku</title>
+<style>
+  :root {
+    --bg: #e8edef; --ink: #1d2b3a; --muted: #5b6b7a; --line: #c5d0d6; --panel: #f7f9fa;
+    --focus: #27406b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+  h1 { font: 700 clamp(2rem, 6vw, 3.4rem)/1 Georgia, "Times New Roman", serif; margin: 0; letter-spacing: -0.02em; }
+  .count { color: var(--muted); }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+  input, select, button, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  input[type=search] { flex: 1 1 220px; }
+  button { cursor: pointer; background: var(--ink); color: #fff; border-color: var(--ink); }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  form#form { display: none; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 16px; margin-bottom: 24px; }
+  form#form.open { display: grid; }
+  form label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); }
+  form .actions { display: flex; align-items: end; }
+  .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 24px 20px; }
+  .book { display: flex; flex-direction: column; }
+  .cover { aspect-ratio: 2 / 3; padding: 16px 14px; color: #fff; display: flex; flex-direction: column; justify-content: space-between; border-radius: 2px 6px 6px 2px; box-shadow: inset 8px 0 0 rgba(0,0,0,.22), 3px 4px 0 var(--line); cursor: pointer; border: none; text-align: left; width: 100%; }
+  .cover:hover { transform: translateY(-2px); }
+  .cover b { font: 700 1.25rem/1.15 Georgia, serif; overflow-wrap: anywhere; }
+  .cover span { font-size: .85rem; opacity: .9; }
+  .meta { padding-top: 10px; font-size: .9rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .meta button { padding: 2px 8px; font-size: .8rem; }
+  .done { color: #2f6f4a; font-weight: 600; }
+  .empty { grid-column: 1 / -1; padding: 40px 0; color: var(--muted); }
+
+  .overlay { position: fixed; inset: 0; background: rgba(20,28,38,.55); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+  .overlay.open { display: flex; }
+  .panel { background: var(--panel); max-width: 640px; width: 100%; padding: 24px; border-radius: 6px; }
+  .panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 16px; }
+  .panel-head h2 { margin: 0 0 4px; font: 700 1.5rem Georgia, serif; }
+  .panel-head p { margin: 0; color: var(--muted); }
+  .panel textarea { width: 100%; min-height: 220px; resize: vertical; }
+  .panel .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+  .panel .saved { font-size: .85rem; color: #2f6f4a; visibility: hidden; }
+  .panel .saved.show { visibility: visible; }
+  .close { background: transparent; color: var(--ink); border: none; font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 2px 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Koleksi Buku ALDAP</h1>
+    <div class="count" id="count"></div>
+  </header>
+
+  <div class="tools">
+    <input type="search" id="q" placeholder="Cari judul atau penulis" aria-label="Cari buku">
+    <select id="genre" aria-label="Filter genre"></select>
+    <select id="status" aria-label="Filter status baca">
+      <option value="">Semua status</option>
+      <option value="sudah">Sudah dibaca</option>
+      <option value="belum">Belum dibaca</option>
+    </select>
+    <button id="toggle" class="ghost" type="button">Tambah buku</button>
+  </div>
+
+  <form id="form">
+    <label>Judul <input name="title" required></label>
+    <label>Penulis <input name="author" required></label>
+    <label>Genre <input name="genre" placeholder="mis. Novel" required></label>
+    <label>Tahun terbit <input name="year" type="number" min="1000" max="2100"></label>
+    <label>Status
+      <select name="read"><option value="belum">Belum dibaca</option><option value="sudah">Sudah dibaca</option></select>
+    </label>
+    <div class="actions"><button type="submit">Simpan buku</button></div>
+  </form>
+
+  <main class="shelf" id="shelf"></main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2 id="pTitle"></h2>
+        <p id="pMeta"></p>
+      </div>
+      <button class="close" id="pClose" type="button" aria-label="Tutup">&times;</button>
+    </div>
+    <label for="pNotes">Tulisan bebas tentang buku ini (ringkasan, kutipan favorit, pendapatmu...)</label>
+    <textarea id="pNotes" placeholder="Tulis apa saja tentang buku ini..."></textarea>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--muted)">
+        <input type="checkbox" id="pRead" style="width:auto"> Sudah dibaca
+      </label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="saved" id="pSaved">Tersimpan</span>
+        <button id="pSave" type="button">Simpan catatan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ["#2f6f73", "#6b3a5b", "#a4442f", "#27406b", "#667a3a", "#8a5a1f"];
+const SAMPLE = [
+  { title: "Laskar Pelangi", author: "Andrea Hirata", genre: "Novel", year: 2005, read: "sudah", notes: "" },
+  { title: "Bumi Manusia", author: "Pramoedya Ananta Toer", genre: "Novel", year: 1980, read: "sudah", notes: "" },
+  { title: "Filosofi Teras", author: "Henry Manampiring", genre: "Pengembangan diri", year: 2018, read: "belum", notes: "" },
+  { title: "Atomic Habits", author: "James Clear", genre: "Pengembangan diri", year: 2018, read: "sudah", notes: "" },
+  { title: "Sapiens", author: "Yuval Noah Harari", genre: "Sejarah", year: 2011, read: "belum", notes: "" },
+  { title: "Cantik Itu Luka", author: "Eka Kurniawan", genre: "Novel", year: 2002, read: "belum", notes: "" }
+];
+const KEY = "aldap-books";
+let books = load();
+let openId = null;
+
+function newId() {
+  return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function load() {
+  let list;
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY));
+    list = Array.isArray(saved) ? saved : SAMPLE.slice();
+  } catch (e) { list = SAMPLE.slice(); }
+  list.forEach(b => { if (!b.id) b.id = newId(); if (typeof b.notes !== "string") b.notes = ""; });
+  return list;
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(books)); } catch (e) {}
+}
+function colorFor(text) {
+  let h = 0;
+  for (const c of text) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return COLORS[h % COLORS.length];
+}
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  Object.assign(n, props || {});
+  kids.forEach(k => n.append(k));
+  return n;
+}
+const $ = id => document.getElementById(id);
+
+function fillGenres() {
+  const current = $("genre").value;
+  const genres = [...new Set(books.map(b => b.genre))].sort();
+  $("genre").replaceChildren(el("option", { value: "", textContent: "Semua genre" }),
+    ...genres.map(g => el("option", { value: g, textContent: g })));
+  $("genre").value = genres.includes(current) ? current : "";
+}
+
+function openBook(id) {
+  const b = books.find(x => x.id === id);
+  if (!b) return;
+  openId = id;
+  $("pTitle").textContent = b.title;
+  $("pMeta").textContent = b.author + " \u00b7 " + b.genre + (b.year ? ", " + b.year : "");
+  $("pNotes").value = b.notes || "";
+  $("pRead").checked = b.read === "sudah";
+  $("pSaved").classList.remove("show");
+  $("overlay").classList.add("open");
+  $("pNotes").focus();
+}
+function closeBook() {
+  $("overlay").classList.remove("open");
+  openId = null;
+}
+function saveNotes() {
+  const b = books.find(x => x.id === openId);
+  if (!b) return;
+  b.notes = $("pNotes").value;
+  b.read = $("pRead").checked ? "sudah" : "belum";
+  save(); fillGenres(); render();
+  $("pSaved").classList.add("show");
+  setTimeout(() => $("pSaved").classList.remove("show"), 1500);
+}
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const g = $("genre").value, s = $("status").value;
+  const list = books.filter(b =>
+    (!q || (b.title + " " + b.author).toLowerCase().includes(q)) &&
+    (!g || b.genre === g) && (!s || b.read === s));
+
+  $("count").textContent = list.length + " dari " + books.length + " buku";
+  const cards = list.map(b => {
+    const cover = el("button", { className: "cover", type: "button" },
+      el("b", { textContent: b.title }), el("span", { textContent: b.author }));
+    cover.style.background = colorFor(b.title);
+    cover.setAttribute("aria-label", "Buka " + b.title);
+    cover.onclick = () => openBook(b.id);
+
+    const status = el("span", { className: b.read === "sudah" ? "done" : "", textContent: b.read === "sudah" ? "Sudah dibaca" : "Belum dibaca" });
+    const hasNotes = b.notes && b.notes.trim() ? " \u00b7 ada catatan" : "";
+    const del = el("button", { className: "ghost", type: "button", textContent: "Hapus" });
+    del.setAttribute("aria-label", "Hapus " + b.title);
+    del.onclick = () => {
+      if (confirm('Hapus "' + b.title + '" dari koleksi?')) {
+        books = books.filter(x => x !== b); save(); fillGenres(); render();
+      }
+    };
+    const info = el("span", { textContent: b.genre + (b.year ? ", " + b.year : "") + hasNotes });
+    return el("article", { className: "book" }, cover,
+      el("div", { className: "meta" }, info, del),
+      el("div", { className: "meta" }, status));
+  });
+  $("shelf").replaceChildren(...(cards.length ? cards :
+    [el("p", { className: "empty", textContent: "Tidak ada buku yang cocok. Ubah pencarian atau tambah buku baru." })]));
+}
+
+$("toggle").onclick = () => $("form").classList.toggle("open");
+["q", "genre", "status"].forEach(id => $(id).addEventListener("input", render));
+$("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData(e.target));
+  books.unshift({ id: newId(), title: d.title.trim(), author: d.author.trim(), genre: d.genre.trim(),
+                  year: d.year ? Number(d.year) : "", read: d.read, notes: "" });
+  save(); e.target.reset(); fillGenres(); render();
+});
+
+$("pClose").onclick = closeBook;
+$("pSave").onclick = saveNotes;
+$("overlay").addEventListener("click", e => { if (e.target.id === "overlay") closeBook(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && openId) closeBook(); });
+
+fillGenres();
+render();
+</script>
+</body>
+</html>
