@@ -16,24 +16,37 @@
   h1 { font: 700 clamp(2rem, 6vw, 3.4rem)/1 Georgia, "Times New Roman", serif; margin: 0; letter-spacing: -0.02em; }
   .count { color: var(--muted); }
   .tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
-  input, select, button { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  input, select, button, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   input[type=search] { flex: 1 1 220px; }
   button { cursor: pointer; background: var(--ink); color: #fff; border-color: var(--ink); }
   button.ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-  form { display: none; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 16px; margin-bottom: 24px; }
-  form.open { display: grid; }
+  form#form { display: none; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 16px; margin-bottom: 24px; }
+  form#form.open { display: grid; }
   form label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); }
   form .actions { display: flex; align-items: end; }
   .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 24px 20px; }
   .book { display: flex; flex-direction: column; }
-  .cover { aspect-ratio: 2 / 3; padding: 16px 14px; color: #fff; display: flex; flex-direction: column; justify-content: space-between; border-radius: 2px 6px 6px 2px; box-shadow: inset 8px 0 0 rgba(0,0,0,.22), 3px 4px 0 var(--line); }
+  .cover { aspect-ratio: 2 / 3; padding: 16px 14px; color: #fff; display: flex; flex-direction: column; justify-content: space-between; border-radius: 2px 6px 6px 2px; box-shadow: inset 8px 0 0 rgba(0,0,0,.22), 3px 4px 0 var(--line); cursor: pointer; border: none; text-align: left; width: 100%; }
+  .cover:hover { transform: translateY(-2px); }
   .cover b { font: 700 1.25rem/1.15 Georgia, serif; overflow-wrap: anywhere; }
   .cover span { font-size: .85rem; opacity: .9; }
   .meta { padding-top: 10px; font-size: .9rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .meta button { padding: 2px 8px; font-size: .8rem; }
   .done { color: #2f6f4a; font-weight: 600; }
   .empty { grid-column: 1 / -1; padding: 40px 0; color: var(--muted); }
+
+  .overlay { position: fixed; inset: 0; background: rgba(20,28,38,.55); display: none; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+  .overlay.open { display: flex; }
+  .panel { background: var(--panel); max-width: 640px; width: 100%; padding: 24px; border-radius: 6px; }
+  .panel-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 16px; }
+  .panel-head h2 { margin: 0 0 4px; font: 700 1.5rem Georgia, serif; }
+  .panel-head p { margin: 0; color: var(--muted); }
+  .panel textarea { width: 100%; min-height: 220px; resize: vertical; }
+  .panel .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+  .panel .saved { font-size: .85rem; color: #2f6f4a; visibility: hidden; }
+  .panel .saved.show { visibility: visible; }
+  .close { background: transparent; color: var(--ink); border: none; font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 2px 6px; }
 </style>
 </head>
 <body>
@@ -68,25 +81,54 @@
   <main class="shelf" id="shelf"></main>
 </div>
 
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2 id="pTitle"></h2>
+        <p id="pMeta"></p>
+      </div>
+      <button class="close" id="pClose" type="button" aria-label="Tutup">&times;</button>
+    </div>
+    <label for="pNotes">Tulisan bebas tentang buku ini (ringkasan, kutipan favorit, pendapatmu...)</label>
+    <textarea id="pNotes" placeholder="Tulis apa saja tentang buku ini..."></textarea>
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--muted)">
+        <input type="checkbox" id="pRead" style="width:auto"> Sudah dibaca
+      </label>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="saved" id="pSaved">Tersimpan</span>
+        <button id="pSave" type="button">Simpan catatan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const COLORS = ["#2f6f73", "#6b3a5b", "#a4442f", "#27406b", "#667a3a", "#8a5a1f"];
 const SAMPLE = [
-  { title: "Laskar Pelangi", author: "Andrea Hirata", genre: "Novel", year: 2005, read: "sudah" },
-  { title: "Bumi Manusia", author: "Pramoedya Ananta Toer", genre: "Novel", year: 1980, read: "sudah" },
-  { title: "Filosofi Teras", author: "Henry Manampiring", genre: "Pengembangan diri", year: 2018, read: "belum" },
-  { title: "Atomic Habits", author: "James Clear", genre: "Pengembangan diri", year: 2018, read: "sudah" },
-  { title: "Sapiens", author: "Yuval Noah Harari", genre: "Sejarah", year: 2011, read: "belum" },
-  { title: "Cantik Itu Luka", author: "Eka Kurniawan", genre: "Novel", year: 2002, read: "belum" }
+  { title: "Laskar Pelangi", author: "Andrea Hirata", genre: "Novel", year: 2005, read: "sudah", notes: "" },
+  { title: "Bumi Manusia", author: "Pramoedya Ananta Toer", genre: "Novel", year: 1980, read: "sudah", notes: "" },
+  { title: "Filosofi Teras", author: "Henry Manampiring", genre: "Pengembangan diri", year: 2018, read: "belum", notes: "" },
+  { title: "Atomic Habits", author: "James Clear", genre: "Pengembangan diri", year: 2018, read: "sudah", notes: "" },
+  { title: "Sapiens", author: "Yuval Noah Harari", genre: "Sejarah", year: 2011, read: "belum", notes: "" },
+  { title: "Cantik Itu Luka", author: "Eka Kurniawan", genre: "Novel", year: 2002, read: "belum", notes: "" }
 ];
 const KEY = "aldap-books";
 let books = load();
+let openId = null;
 
+function newId() {
+  return "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 function load() {
+  let list;
   try {
     const saved = JSON.parse(localStorage.getItem(KEY));
-    if (Array.isArray(saved)) return saved;
-  } catch (e) {}
-  return SAMPLE.slice();
+    list = Array.isArray(saved) ? saved : SAMPLE.slice();
+  } catch (e) { list = SAMPLE.slice(); }
+  list.forEach(b => { if (!b.id) b.id = newId(); if (typeof b.notes !== "string") b.notes = ""; });
+  return list;
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(books)); } catch (e) {}
@@ -102,7 +144,6 @@ function el(tag, props, ...kids) {
   kids.forEach(k => n.append(k));
   return n;
 }
-
 const $ = id => document.getElementById(id);
 
 function fillGenres() {
@@ -111,6 +152,32 @@ function fillGenres() {
   $("genre").replaceChildren(el("option", { value: "", textContent: "Semua genre" }),
     ...genres.map(g => el("option", { value: g, textContent: g })));
   $("genre").value = genres.includes(current) ? current : "";
+}
+
+function openBook(id) {
+  const b = books.find(x => x.id === id);
+  if (!b) return;
+  openId = id;
+  $("pTitle").textContent = b.title;
+  $("pMeta").textContent = b.author + " \u00b7 " + b.genre + (b.year ? ", " + b.year : "");
+  $("pNotes").value = b.notes || "";
+  $("pRead").checked = b.read === "sudah";
+  $("pSaved").classList.remove("show");
+  $("overlay").classList.add("open");
+  $("pNotes").focus();
+}
+function closeBook() {
+  $("overlay").classList.remove("open");
+  openId = null;
+}
+function saveNotes() {
+  const b = books.find(x => x.id === openId);
+  if (!b) return;
+  b.notes = $("pNotes").value;
+  b.read = $("pRead").checked ? "sudah" : "belum";
+  save(); fillGenres(); render();
+  $("pSaved").classList.add("show");
+  setTimeout(() => $("pSaved").classList.remove("show"), 1500);
 }
 
 function render() {
@@ -122,9 +189,14 @@ function render() {
 
   $("count").textContent = list.length + " dari " + books.length + " buku";
   const cards = list.map(b => {
-    const cover = el("div", { className: "cover" }, el("b", { textContent: b.title }), el("span", { textContent: b.author }));
+    const cover = el("button", { className: "cover", type: "button" },
+      el("b", { textContent: b.title }), el("span", { textContent: b.author }));
     cover.style.background = colorFor(b.title);
+    cover.setAttribute("aria-label", "Buka " + b.title);
+    cover.onclick = () => openBook(b.id);
+
     const status = el("span", { className: b.read === "sudah" ? "done" : "", textContent: b.read === "sudah" ? "Sudah dibaca" : "Belum dibaca" });
+    const hasNotes = b.notes && b.notes.trim() ? " \u00b7 ada catatan" : "";
     const del = el("button", { className: "ghost", type: "button", textContent: "Hapus" });
     del.setAttribute("aria-label", "Hapus " + b.title);
     del.onclick = () => {
@@ -132,7 +204,7 @@ function render() {
         books = books.filter(x => x !== b); save(); fillGenres(); render();
       }
     };
-    const info = el("span", { textContent: b.genre + (b.year ? ", " + b.year : "") });
+    const info = el("span", { textContent: b.genre + (b.year ? ", " + b.year : "") + hasNotes });
     return el("article", { className: "book" }, cover,
       el("div", { className: "meta" }, info, del),
       el("div", { className: "meta" }, status));
@@ -146,10 +218,15 @@ $("toggle").onclick = () => $("form").classList.toggle("open");
 $("form").addEventListener("submit", e => {
   e.preventDefault();
   const d = Object.fromEntries(new FormData(e.target));
-  books.unshift({ title: d.title.trim(), author: d.author.trim(), genre: d.genre.trim(),
-                  year: d.year ? Number(d.year) : "", read: d.read });
+  books.unshift({ id: newId(), title: d.title.trim(), author: d.author.trim(), genre: d.genre.trim(),
+                  year: d.year ? Number(d.year) : "", read: d.read, notes: "" });
   save(); e.target.reset(); fillGenres(); render();
 });
+
+$("pClose").onclick = closeBook;
+$("pSave").onclick = saveNotes;
+$("overlay").addEventListener("click", e => { if (e.target.id === "overlay") closeBook(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && openId) closeBook(); });
 
 fillGenres();
 render();
